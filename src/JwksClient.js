@@ -49,7 +49,7 @@ export class JwksClient {
       }
 
       const signingKeys = keys
-        .filter(key => key.use === 'sig' && key.kty === 'RSA' && key.kid && ((key.x5c && key.x5c.length) || (key.n && key.e)))
+        .filter(key => key.use === 'sig' && key.kty === 'RSA' && ((key.x5c && key.x5c.length) || (key.n && key.e)))
         .map(key => {
           if (key.x5c && key.x5c.length) {
             return { kid: key.kid, nbf: key.nbf, publicKey: certToPEM(key.x5c[0]) };
@@ -75,7 +75,13 @@ export class JwksClient {
         return cb(err);
       }
 
-      const key = keys.find(k => k.kid === kid);
+      const kidDefined = kid !== undefined && kid !== null;
+      if (!kidDefined && keys.length > 1) {
+        this.logger('No KID specified and JWKS endpoint returned more than 1 key');
+        return cb(new SigningKeyNotFoundError('No KID specified and JWKS endpoint returned more than 1 key'));
+      }
+
+      const key = keys.find(k => !kidDefined || k.kid === kid);
       if (key) {
         return cb(null, key);
       } else {
